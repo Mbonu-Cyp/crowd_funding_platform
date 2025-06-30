@@ -377,3 +377,54 @@
         (ok true)
     )
 )
+
+;; Governance and Reporting System
+
+;; Additional Constants for Governance
+(define-constant err-already-reported (err u110))
+
+;; Governance Data Maps
+(define-map campaign-reports
+    {
+        campaign-id: uint,
+        reporter: principal,
+    }
+    {
+        reason: (string-utf8 500),
+        timestamp: uint,
+        status: (string-ascii 20),
+    }
+)
+
+;; Governance Public Functions
+(define-public (report-campaign
+        (campaign-id uint)
+        (reason (string-utf8 500))
+    )
+    (let ((campaign (unwrap! (map-get? campaigns { campaign-id: campaign-id })
+            (err err-not-found)
+        )))
+        ;; Verify campaign exists
+        (asserts! (is-eq tx-sender contract-owner) (err err-owner-only))
+        ;; Check if already reported
+        (asserts!
+            (is-eq
+                (map-get? campaign-reports {
+                    campaign-id: campaign-id,
+                    reporter: tx-sender,
+                })
+                none
+            )
+            (err err-already-reported)
+        )
+        ;; Add report
+        (ok (map-set campaign-reports {
+            campaign-id: campaign-id,
+            reporter: tx-sender,
+        } {
+            reason: reason,
+            timestamp: (current-time),
+            status: "pending",
+        }))
+    )
+)
